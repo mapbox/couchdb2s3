@@ -4,7 +4,8 @@
     "description": "Export CouchDB databases to line oriented json files on s3",
     "main": "index.js",
     "bin": {
-        "couchdb2s3": "couchdb2s3.js"
+        "couchdb2s3": "couchdb2s3.js",
+        "s32couchdb": "s32couchdb.js"
     },
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1"
@@ -17,7 +18,10 @@
         "optimist": "https://github.com/willwhite/node-optimist/tarball/config-file",
         "henry": "0.0.x"
     },
-    "repository": "",
+    "repository": {
+        "type" : "git"
+       , "url" : "http://github.com/mapbox/couchdb2s3.git"
+    },
     "author": "MapBox",
     "license": "BSD"
 }
