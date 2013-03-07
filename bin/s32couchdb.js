@@ -159,5 +159,6 @@ Step(function() {
         console.error(err);
         process.exit(1);
     }
+    henry.stop();
     console.log('Import of %s database into %s completed', dbName , argv.database);
 });
