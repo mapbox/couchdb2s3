@@ -5,6 +5,7 @@ var fs = require('fs');
 var url = require('url');
 var qs = require('querystring').stringify;
 var knox = require('knox');
+var Henry = require('henry');
 var Step = require('step');
 var request = require('request');
 var _ = require('underscore');
@@ -13,15 +14,16 @@ var argv = require('optimist')
     .usage('Import CouchDB Database from s3\n' +
            'Usage: $0 [required options] [--remoteName]'
     )
-    .demand(['awsKey', 'awsSecret', 'inputBucket', 'database'])
+    .demand(['inputBucket', 'database'])
     .argv;
+var s3Client;
 
 process.title = 's32couchdb';
 
-var s3Client = knox.createClient({
-    key: argv.awsKey,
-    secret: argv.awsSecret,
-    bucket: argv.inputBucket
+var henry = new Henry({
+    api: argv.awsMetadataEndpoint
+}).on('refresh', function(credentials) {
+    util.log('Henry refresh: ' + credentials.key);
 });
 
 var dbUrl = url.parse(argv.database);
@@ -64,6 +66,20 @@ var pad = function(n) {
 };
 
 Step(function() {
+    s3Client = knox.createClient({
+        // Cannot pass null or empty key/secret to knox constructor
+        // 'x' is just filler and Henry will update it.
+        key: argv.awsKey || 'x',
+        secret: argv.awsSecret || 'x',
+        bucket: argv.inputBucket
+    });
+    henry.add(s3Client, function(err) {
+        if (err && ['ETIMEDOUT', 'EHOSTUNREACH', 'ECONNREFUSED']
+            .indexOf(err.code) === -1) return this(err);
+        this(null);
+    }.bind(this));
+}, function(err) {
+    if (err) throw err;
     var callback = this;
     var d = new Date(Date.now() - 864e5); // Look 1 day back.
     var options = {
@@ -143,5 +159,6 @@ Step(function() {
         console.error(err);
         process.exit(1);
     }
+    henry.stop();
     console.log('Import of %s database into %s completed', dbName , argv.database);
 });
