@@ -56,7 +56,7 @@ Step(function() {
         // 'x' is just filler and Henry will update it.
         key: argv.awsKey || 'x',
         secret: argv.awsSecret || 'x',
-        bucket: argv.inputBucket
+        bucket: argv.outputBucket
     });
     henry.add(s3Client, function(err) {
         if (err && ['ETIMEDOUT', 'EHOSTUNREACH', 'ECONNREFUSED']
