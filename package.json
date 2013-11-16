@@ -13,7 +13,8 @@
     "dependencies": {
         "underscore": "1.1.x",
         "step": "0.0.x",
-        "request": "2.2.x",
+        "request": "2.27.x",
+        "carrier": "0.1.13",
         "knox": "0.5.x",
         "optimist": "https://github.com/willwhite/node-optimist/archive/config-file.tar.gz",
         "henry": "0.0.x"
