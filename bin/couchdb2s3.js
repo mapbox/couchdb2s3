@@ -96,7 +96,7 @@ Step(function() {
         });
 }, function(err, data) {
     if (err) throw err;
-    fs.writeFile(tempFilepath, data.join('\n'), 'utf8', this);
+    fs.writeFile(tempFilepath, data.join('\n') + '\n', 'utf8', this);
 }, function(err) {
     if (err) throw err;
     var next = this;
