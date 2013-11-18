@@ -8,6 +8,7 @@ var knox = require('knox');
 var Henry = require('henry');
 var Step = require('step');
 var request = require('request');
+var carrier = require('carrier');
 var argv = require('optimist')
     .config(['config', 'jobflows'])
     .usage('Export CouchDB Database to s3\n' +
@@ -68,14 +69,34 @@ Step(function() {
     var uri = url.format({
         protocol: dbUrl.protocol,
         host: dbUrl.host,
-        pathname: dbUrl.pathname + "/_all_docs?include_docs=true"
+        pathname: dbUrl.pathname + "/_all_docs",
+        query: {include_docs:"true"}
     });
-    request({ uri: uri, auth: dbUrl.auth }, this);
-}, function(err, res, data) {
+
+    var next = this;
+    var lines = [];
+    var errorCount = 0;
+    request({uri: uri, auth: dbUrl.auth})
+       .on('error', function() { throw new Error("Could not connect to CouchDB"); })
+       .on('response', function(res) {
+           if (res.statusCode != 200) throw new Error("Bad response from CouchDB");
+           carrier.carry(res, function(line) {
+               try {
+                   var line = JSON.parse(line.replace(/(,$)/, ""));
+                   lines.push(JSON.stringify(line.doc));
+               }
+               catch(e) {
+                   errorCount++;
+               }
+            }).on('end', function() {
+                // Error count should be exactly 2.
+                if (errorCount == 2) return next(null, lines)
+                next(new Error("Failed to parse database"));
+            });
+        });
+}, function(err, data) {
     if (err) throw err;
-    if (res.statusCode != 200) throw new Error("Could not connect to CouchDB");
-    data = JSON.parse(data).rows.map(function(v) { return JSON.stringify(v.doc); });
-    fs.writeFile(tempFilepath, data.join('\n'), 'utf8', this);
+    fs.writeFile(tempFilepath, data.join('\n') + '\n', 'utf8', this);
 }, function(err) {
     if (err) throw err;
     var next = this;
