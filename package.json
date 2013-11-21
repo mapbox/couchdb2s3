@@ -1,10 +1,11 @@
 {
     "name": "couchdb2s3",
-    "version": "0.0.2",
+    "version": "0.1.0",
     "description": "Export CouchDB databases to line oriented json files on s3",
     "main": "index.js",
     "bin": {
         "couchdb2s3": "bin/couchdb2s3.js",
+        "couchdb2file": "bin/couchdb2file.js",
         "s32couchdb": "bin/s32couchdb.js"
     },
     "scripts": {

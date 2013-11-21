@@ -82,7 +82,7 @@ Step(function() {
            if (res.statusCode != 200) throw new Error("Bad response from CouchDB");
            carrier.carry(res, function(line) {
                try {
-                   var line = JSON.parse(line.replace(/(,$)/, ""));
+                   line = JSON.parse(line.replace(/(,$)/, ""));
                    lines.push(JSON.stringify(line.doc));
                }
                catch(e) {
@@ -90,7 +90,7 @@ Step(function() {
                }
             }).on('end', function() {
                 // Error count should be exactly 2.
-                if (errorCount == 2) return next(null, lines)
+                if (errorCount == 2) return next(null, lines);
                 next(new Error("Failed to parse database"));
             });
         });
@@ -128,5 +128,5 @@ Step(function() {
         process.exit(1);
     }
     henry.stop();
-    console.log('%s : Uploaded %s database to %s', (new Date), argv.database, s3Key);
+    console.log('%s : Uploaded %s database to %s', (new Date()), argv.database, s3Key);
 });

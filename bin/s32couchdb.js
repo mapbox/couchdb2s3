@@ -11,7 +11,7 @@ var request = require('request');
 var _ = require('underscore');
 var argv = require('optimist')
     .config(['config', 'jobflows'])
-    .usage('Import CouchDB Database from s3\n' +
+    .usage('Import CouchDB Database from S3\n' +
            'Usage: $0 [required options] [--remoteName]'
     )
     .demand(['inputBucket', 'database'])
@@ -133,7 +133,7 @@ Step(function() {
             data = data.concat(_(buf.split('\n')).compact());
             if (buf[buf.length - 1] !== '\n')
                 prev = data.pop();
-            
+
             if (data.length > importSize)
                 importData(data.splice(0, importSize), function(err) {
                     if (err) {

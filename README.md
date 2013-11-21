@@ -4,10 +4,14 @@ Export a CouchDB database as a line oriented JSON file, then upload that to S3.
 Then later on s32couchdb that same file to get it into CouchDB instance.
 Or just use that line-oriented version of your CouchDB database for something else.
 
+## Install
+
+    npm install -g couchdb2s3
+
 ## Usage
 
 ```
-./bin/couchdb2s3.js --config config.json \
+couchdb2s3 --config config.json \
   --outputBucket my-bucket \
   --database http://localhost:5984/my-database
 ```
@@ -15,7 +19,15 @@ Or just use that line-oriented version of your CouchDB database for something el
 and
 
 ```
-./bin/s32couchdb.js --config config.json \
+couchdb2file --config config.json \
+  --outputFile myfile.json \
+  --database http://localhost:5984/my-database
+```
+
+and
+
+```
+s32couchdb --config config.json \
   --inputBucket my-bucket \
   --database http://localhost:5984/my-database
 ```
