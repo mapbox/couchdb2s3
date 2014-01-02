@@ -101,7 +101,6 @@ Step(function() {
                }
             }).on('end', function() {
                 var done = function() {
-                    console.log(linebuf.length);
                     // Error count should be exactly 2.
                     if (errorCount == 2) {
                         return fs.appendFile(tempFilepath, linebuf.join(''), 'utf8', next);
