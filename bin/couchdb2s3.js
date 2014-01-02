@@ -9,6 +9,7 @@ var Henry = require('henry');
 var Step = require('step');
 var request = require('request');
 var carrier = require('carrier');
+var Queue = require('basic-queue');
 var argv = require('optimist')
     .config(['config', 'jobflows'])
     .usage('Export CouchDB Database to s3\n' +
@@ -74,29 +75,43 @@ Step(function() {
     });
 
     var next = this;
-    var lines = [];
     var errorCount = 0;
+    var q = new Queue(function(lines, cb) {
+        fs.appendFile(tempFilepath, lines, 'utf8', cb);
+    }, 1);
     request({uri: uri, auth: dbUrl.auth})
        .on('error', function() { throw new Error("Could not connect to CouchDB"); })
        .on('response', function(res) {
            if (res.statusCode != 200) throw new Error("Bad response from CouchDB");
+           // Buffer writes for better speed, thanks to fewer disk writes.
+           var linebuf = [];
            carrier.carry(res, function(line) {
                try {
                    line = JSON.parse(line.replace(/(,$)/, ""));
-                   lines.push(JSON.stringify(line.doc));
+                   line = JSON.stringify(line.doc) + "\n";
+                   linebuf.push(line);
+
+                   if (linebuf.length > 50000)  {
+                       q.add(linebuf.join(''));
+                       linebuf = [];
+                   }
                }
                catch(e) {
                    errorCount++;
                }
             }).on('end', function() {
-                // Error count should be exactly 2.
-                if (errorCount == 2) return next(null, lines);
-                next(new Error("Failed to parse database"));
+                var done = function() {
+                    console.log(linebuf.length);
+                    // Error count should be exactly 2.
+                    if (errorCount == 2) {
+                        return fs.appendFile(tempFilepath, linebuf.join(''), 'utf8', next);
+                    }
+                    next(new Error("Failed to parse database"));
+                }
+                if (q.running) q.on('empty', done);
+                else done();
             });
         });
-}, function(err, data) {
-    if (err) throw err;
-    fs.writeFile(tempFilepath, data.join('\n') + '\n', 'utf8', this);
 }, function(err) {
     if (err) throw err;
     var next = this;
