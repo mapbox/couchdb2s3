@@ -9,6 +9,7 @@ var Henry = require('henry');
 var Step = require('step');
 var request = require('request');
 var carrier = require('carrier');
+var Queue = require('basic-queue');
 var argv = require('optimist')
     .config(['config', 'jobflows'])
     .usage('Export CouchDB Database to s3\n' +
@@ -74,8 +75,10 @@ Step(function() {
     });
 
     var next = this;
-    var lines = [];
     var errorCount = 0;
+    var q = new Queue(function(line, cb) {
+        fs.appendFile(tempFilepath, line, 'utf8', cb);
+    }, 1);
     request({uri: uri, auth: dbUrl.auth})
        .on('error', function() { throw new Error("Could not connect to CouchDB"); })
        .on('response', function(res) {
@@ -83,20 +86,19 @@ Step(function() {
            carrier.carry(res, function(line) {
                try {
                    line = JSON.parse(line.replace(/(,$)/, ""));
-                   lines.push(JSON.stringify(line.doc));
+                   q.add(JSON.stringify(line) + "\n");
                }
                catch(e) {
                    errorCount++;
                }
             }).on('end', function() {
-                // Error count should be exactly 2.
-                if (errorCount == 2) return next(null, lines);
-                next(new Error("Failed to parse database"));
+                q.on('empty', function(err) {
+                    // Error count should be exactly 2.
+                    if (errorCount == 2) return next(null);
+                    next(new Error("Failed to parse database"));
+                });
             });
         });
-}, function(err, data) {
-    if (err) throw err;
-    fs.writeFile(tempFilepath, data.join('\n') + '\n', 'utf8', this);
 }, function(err) {
     if (err) throw err;
     var next = this;
