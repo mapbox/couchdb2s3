@@ -5,7 +5,6 @@
     "main": "index.js",
     "bin": {
         "couchdb2s3": "bin/couchdb2s3.js",
-        "couchdb2file": "bin/couchdb2file.js",
         "s32couchdb": "bin/s32couchdb.js"
     },
     "scripts": {
