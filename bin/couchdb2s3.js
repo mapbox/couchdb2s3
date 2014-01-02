@@ -76,27 +76,40 @@ Step(function() {
 
     var next = this;
     var errorCount = 0;
-    var q = new Queue(function(line, cb) {
-        fs.appendFile(tempFilepath, line, 'utf8', cb);
+    var q = new Queue(function(lines, cb) {
+        fs.appendFile(tempFilepath, lines, 'utf8', cb);
     }, 1);
     request({uri: uri, auth: dbUrl.auth})
        .on('error', function() { throw new Error("Could not connect to CouchDB"); })
        .on('response', function(res) {
            if (res.statusCode != 200) throw new Error("Bad response from CouchDB");
+           // Buffer writes for better speed, thanks to fewer disk writes.
+           var linebuf = [];
            carrier.carry(res, function(line) {
                try {
                    line = JSON.parse(line.replace(/(,$)/, ""));
-                   q.add(JSON.stringify(line) + "\n");
+                   line = JSON.stringify(line.doc) + "\n";
+                   linebuf.push(line);
+
+                   if (linebuf.length > 50000)  {
+                       q.add(linebuf.join(''));
+                       linebuf = [];
+                   }
                }
                catch(e) {
                    errorCount++;
                }
             }).on('end', function() {
-                q.on('empty', function(err) {
+                var done = function() {
+                    console.log(linebuf.length);
                     // Error count should be exactly 2.
-                    if (errorCount == 2) return next(null);
+                    if (errorCount == 2) {
+                        return fs.appendFile(tempFilepath, linebuf.join(''), 'utf8', next);
+                    }
                     next(new Error("Failed to parse database"));
-                });
+                }
+                if (q.running) q.on('empty', done);
+                else done();
             });
         });
 }, function(err) {
