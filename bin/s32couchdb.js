@@ -42,12 +42,17 @@ var importData = function(docs, callback) {
         host: dbUrl.host,
         pathname: dbUrl.pathname + "/_bulk_docs"
     });
+    var auth = dbUrl.auth;
+    if (auth) {
+        auth = dbUrl.auth.split(':');
+        auth = { user: auth[0], pass: auth[1] };
+    }
     request({
         method: 'POST',
         headers: {'Content-Type': 'application/json' },
         body: JSON.stringify({"new_edits": false, "docs": docs}),
         uri: uri,
-        auth: dbUrl.auth
+        auth: auth
     }, function(err, res){
         if (res.statusCode != 201)
             return callback(new Error('Got '+ res.statusCode +' from CouchDB'));
@@ -74,7 +79,7 @@ Step(function() {
         bucket: argv.inputBucket
     });
     henry.add(s3Client, function(err) {
-        if (err && ['ETIMEDOUT', 'EHOSTUNREACH', 'ECONNREFUSED']
+        if (err && ['ETIMEDOUT', 'EHOSTUNREACH', 'ECONNREFUSED', 'Unknown system errno 64']
             .indexOf(err.code) === -1) return this(err);
         this(null);
     }.bind(this));
@@ -90,6 +95,9 @@ Step(function() {
 
     // Do a listing... use most recent file, log which it was.
     s3Client.get('?' + qs(options)).on('response', function(res) {
+        if (res.statusCode != 200)
+            return callback(new Error('s3 returned HTTP '+ res.statusCode));
+
         var xml = '';
         res.on('error', callback);
         res.on('close', callback);
