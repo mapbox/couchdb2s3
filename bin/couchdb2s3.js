@@ -47,7 +47,7 @@ var pad = function(n) {
 };
 
 var d = new Date();
-var s3Key = util.format('/db/%s-%s-%s-%s-%s-%s', dbName, d.getUTCFullYear(),
+var s3Key = util.format('db/%s-%s-%s-%s-%s-%s', dbName, d.getUTCFullYear(),
     pad(d.getUTCMonth() + 1), pad(d.getUTCDate()), pad(d.getUTCHours()), rand);
 
 // LineProcessor class, transforms database into line oriented records.
@@ -94,7 +94,6 @@ LineProcessor.prototype._transform = function(chunk, encoding, done) {
     this.buffer = '';
     this._extra = '';
 
-    var lines = [];
     chunk.split('\n').forEach(this.lineIterator, this);
 
     if (this._errorCount > 2)
@@ -105,8 +104,7 @@ LineProcessor.prototype._transform = function(chunk, encoding, done) {
     done();
 };
 LineProcessor.prototype._flush = function(done) {
-    (this._extra + this.buffer.toString('utf8')).split('\n')
-        .forEach(this.lineIterator, this);
+    (this._extra + this.buffer).split('\n').forEach(this.lineIterator, this);
 
     if (this._errorCount != 2) {
         return done(new Error('Failed to parse database'));
@@ -126,14 +124,12 @@ db.relax({
     console.error(err);
     process.exit();
 }).on('finish', function() {
-    console.log('created ' + tempFilepath);
-    return;
     var reader = fs.createReadStream(tempFilepath);
     s3.putObject({
         Bucket: argv.outputBucket,
         Key: s3Key,
-        Body: stream,
-        'x-amz-server-side-encryption':'AES256'
+        Body: reader,
+        ServerSideEncryption:'AES256'
     }, function(err) {
         if (err) {
             console.error(err);
