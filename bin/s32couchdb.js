@@ -56,14 +56,7 @@ ImportStream.prototype.flush = function(done) {
     docs = docs.filter(function(v) {
         return v.length > 0;
     }).map(function(v) {
-        try {
-            v = JSON.parse(v);
-        } catch(e) {
-            console.log(v);
-            console.log('---');
-            console.log(this.buffer);
-            throw e;
-        }
+        v = JSON.parse(v);
         // support wrapped docs.
         if (v.doc && v.doc._id) return v.doc;
         return v;
