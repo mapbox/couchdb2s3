@@ -19,7 +19,11 @@ process.title = 'couchdb2s3';
 
 var dbUrl = url.parse(argv.database);
 var dbName = dbUrl.pathname.split('/')[1];
-var db = nano(url.format({protocol: dbUrl.protocol, host: dbUrl.host})); //todo test auth creds
+var db = nano(url.format({
+    protocol: dbUrl.protocol,
+    host: dbUrl.host,
+    auth: dbUrl.auth
+}));
 
 AWS.config.update({
     accessKeyId: argv.awsKey,

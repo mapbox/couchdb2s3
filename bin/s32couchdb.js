@@ -18,7 +18,12 @@ process.title = 's32couchdb';
 
 var dbUrl = url.parse(argv.database);
 var dbName = dbUrl.pathname.split('/')[1];
-var db = nano(url.format({protocol: dbUrl.protocol, host: dbUrl.host})).use(dbName); //todo test auth creds
+var db = nano(url.format({
+    protocol: dbUrl.protocol,
+    host: dbUrl.host,
+    auth: dbUrl.auth
+})).use(dbName);
+
 var remoteName = argv.remoteName || dbName;
 
 AWS.config.update({
@@ -90,7 +95,6 @@ s3.listObjects({
         throw new Error('Unable to locate db on s3');
 
     var key = data.Contents.pop().Key
-    console.log('Using database %s', key);
 
     var importer = new ImportStream();
     var reader = s3.getObject({
@@ -104,7 +108,7 @@ s3.listObjects({
                 console.error(err);
                 process.exit(1);
             }
-            console.log('Import of %s database into %s completed', remoteName , argv.database);
+            console.log('%s : Imported %s into %s/%s', (new Date()), key, dbUrl.host, dbName);
         });
     });
 });
