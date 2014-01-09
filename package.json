@@ -11,8 +11,6 @@
         "test": "echo \"Error: no test specified\" && exit 1"
     },
     "dependencies": {
-        "underscore": "1.1.x",
-        "step": "0.0.x",
         "optimist": "https://github.com/willwhite/node-optimist/archive/config-file.tar.gz",
         "aws-sdk": "1.17.x",
         "nano": "4.2.x"
@@ -20,6 +18,9 @@
     "repository": {
         "type" : "git",
         "url" : "http://github.com/mapbox/couchdb2s3.git"
+    },
+    "engines": {
+        "node": ">0.10.0"
     },
     "author": "MapBox",
     "license": "BSD"
