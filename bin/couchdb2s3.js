@@ -6,7 +6,6 @@ var url = require('url');
 var crypto = require('crypto');
 var Transform = require('stream').Transform;
 var AWS = require('aws-sdk');
-var Step = require('step');
 var nano = require('nano');
 var argv = require('optimist')
     .config(['config', 'jobflows'])
@@ -87,7 +86,7 @@ LineProcessor.prototype.lineIterator = function(line, i, arr) {
 };
 
 LineProcessor.prototype._transform = function(chunk, encoding, done) {
-    this.buffer = this.buffer + chunk.toString('utf8');
+    this.buffer += chunk.toString('utf8');
     if (this.buffer.length < this.bufferLim) return done();
 
     chunk = this._extra + this.buffer;
@@ -122,7 +121,7 @@ db.relax({
     method: 'GET'
 }).pipe(parser).pipe(writer).on('error', function(err) {
     console.error(err);
-    process.exit();
+    process.exit(1);
 }).on('finish', function() {
     var reader = fs.createReadStream(tempFilepath);
     s3.putObject({
