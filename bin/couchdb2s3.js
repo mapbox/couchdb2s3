@@ -79,7 +79,13 @@ Step(function() {
     var q = new Queue(function(lines, cb) {
         fs.appendFile(tempFilepath, lines, 'utf8', cb);
     }, 1);
-    request({uri: uri, auth: dbUrl.auth})
+
+    var auth = dbUrl.auth;
+    if (auth) {
+        auth = dbUrl.auth.split(':');
+        auth = { user: auth[0], pass: auth[1] };
+    }
+    request({uri: uri, auth: auth})
        .on('error', function() { throw new Error("Could not connect to CouchDB"); })
        .on('response', function(res) {
            if (res.statusCode != 200) throw new Error("Bad response from CouchDB");
