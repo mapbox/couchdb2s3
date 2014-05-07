@@ -4,12 +4,9 @@ var util = require('util');
 var fs = require('fs');
 var url = require('url');
 var crypto = require('crypto');
-var knox = require('knox');
-var Henry = require('henry');
-var Step = require('step');
-var request = require('request');
-var carrier = require('carrier');
-var Queue = require('basic-queue');
+var Transform = require('stream').Transform;
+var AWS = require('aws-sdk');
+var nano = require('nano');
 var argv = require('optimist')
     .config(['config', 'jobflows'])
     .usage('Export CouchDB Database to s3\n' +
@@ -17,19 +14,23 @@ var argv = require('optimist')
     )
     .demand(['outputBucket', 'database'])
     .argv;
-var s3Client;
 
 process.title = 'couchdb2s3';
 
-var henry = new Henry({
-    api: argv.awsMetadataEndpoint
-}).on('refresh', function(credentials) {
-    util.log('Henry refresh: ' + credentials.key);
-});
-
 var dbUrl = url.parse(argv.database);
 var dbName = dbUrl.pathname.split('/')[1];
-var dbClient;
+var db = nano(url.format({
+    protocol: dbUrl.protocol,
+    host: dbUrl.host,
+    auth: dbUrl.auth
+}));
+
+AWS.config.update({
+    accessKeyId: argv.awsKey,
+    secretAccessKey: argv.awsSecret,
+    region: 'us-east-1'
+});
+var s3 = new AWS.S3;
 
 var tempFilepath = '/tmp/couchdb2s3-'+ dbName +'-'+ (new Date()).getTime();
 
@@ -49,104 +50,97 @@ var pad = function(n) {
 };
 
 var d = new Date();
-var s3Key = util.format('/db/%s-%s-%s-%s-%s-%s', dbName, d.getUTCFullYear(),
+var s3Key = util.format('db/%s-%s-%s-%s-%s-%s', dbName, d.getUTCFullYear(),
     pad(d.getUTCMonth() + 1), pad(d.getUTCDate()), pad(d.getUTCHours()), rand);
 
-Step(function() {
-    s3Client = knox.createClient({
-        // Cannot pass null or empty key/secret to knox constructor
-        // 'x' is just filler and Henry will update it.
-        key: argv.awsKey || 'x',
-        secret: argv.awsSecret || 'x',
-        bucket: argv.outputBucket
-    });
-    henry.add(s3Client, function(err) {
-        if (err && ['ETIMEDOUT', 'EHOSTUNREACH', 'ECONNREFUSED']
-            .indexOf(err.code) === -1) return this(err);
-        this(null);
-    }.bind(this));
-}, function(err) {
-    if (err) throw err;
-    var uri = url.format({
-        protocol: dbUrl.protocol,
-        host: dbUrl.host,
-        pathname: dbUrl.pathname + "/_all_docs",
-        query: {include_docs:"true"}
-    });
+// LineProcessor class, transforms database into line oriented records.
+//
+util.inherits(LineProcessor, Transform);
+function LineProcessor(opts) {
+    opts = opts || {};
+    opts.decodeStrings = true;
+    Transform.call(this, opts);
 
-    var next = this;
-    var errorCount = 0;
-    var q = new Queue(function(lines, cb) {
-        fs.appendFile(tempFilepath, lines, 'utf8', cb);
-    }, 1);
+    // Buffer
+    this.bufferLim = Math.pow(2, 18)
+    this.buffer = '';
 
-    var auth = dbUrl.auth;
-    if (auth) {
-        auth = dbUrl.auth.split(':');
-        auth = { user: auth[0], pass: auth[1] };
+    // Iterator variables
+    this._extra = '';
+    this._lines = [];
+    this._errorCount = 0;
+}
+LineProcessor.prototype.lineIterator = function(line, i, arr) {
+    // The last element may be truncated, just hold onto it for now.
+    if (i == (arr.length - 1)) {
+        this._extra = line;
+        return;
     }
-    request({uri: uri, auth: auth})
-       .on('error', function() { throw new Error("Could not connect to CouchDB"); })
-       .on('response', function(res) {
-           if (res.statusCode != 200) throw new Error("Bad response from CouchDB");
-           // Buffer writes for better speed, thanks to fewer disk writes.
-           var linebuf = [];
-           carrier.carry(res, function(line) {
-               try {
-                   line = JSON.parse(line.replace(/(,$)/, ""));
-                   line = JSON.stringify(line.doc) + "\n";
-                   linebuf.push(line);
 
-                   if (linebuf.length > 50000)  {
-                       q.add(linebuf.join(''));
-                       linebuf = [];
-                   }
-               }
-               catch(e) {
-                   errorCount++;
-               }
-            }).on('end', function() {
-                var done = function() {
-                    // Error count should be exactly 2.
-                    if (errorCount == 2) {
-                        return fs.appendFile(tempFilepath, linebuf.join(''), 'utf8', next);
-                    }
-                    next(new Error("Failed to parse database"));
-                }
-                if (q.running) q.on('empty', done);
-                else done();
-            });
-        });
-}, function(err) {
-    if (err) throw err;
-    var next = this;
-    var tries = 3;
-    var put = function() {
-        s3Client.putFile(tempFilepath, s3Key, {
-            'x-amz-server-side-encryption':'AES256'
-        }, function(err, res) {
-            if (!err) return next(null, res);
-            else if (tries > 0) {
-                console.log('Upload to s3 failed, trying again.');
-                tries--;
-                return put();
-            }
-            return next(err);
-        });
-    };
-    put();
+    if (line.length == 0) return;
 
-}, function(err, res) {
-    if (err) throw err;
-    if (!res) throw new Error('upload failed');
-    if (res.statusCode !== 200) throw new Error('s3 returned ' + res.statusCode);
-
-    fs.unlink(tempFilepath, this);
-}, function(err) {
-    if (err) {
-        console.error(err);
-        process.exit(1);
+    try {
+        line = JSON.parse(line.replace(/,\s?$/, ""));
+        line = JSON.stringify(line.doc) + "\n";
+        this._lines.push(line);
     }
-    henry.stop();
-    console.log('%s : Uploaded %s database to %s', (new Date()), argv.database, s3Key);
+    catch(e) {
+        this._errorCount++;
+    }
+};
+
+LineProcessor.prototype._transform = function(chunk, encoding, done) {
+    this.buffer += chunk.toString('utf8');
+    if (this.buffer.length < this.bufferLim) return done();
+
+    chunk = this._extra + this.buffer;
+    this.buffer = '';
+    this._extra = '';
+
+    chunk.split('\n').forEach(this.lineIterator, this);
+
+    if (this._errorCount > 2)
+        return done(new Error('Failed to parse database'));
+
+    this.push(this._lines.join(''));
+    this._lines = [];
+    done();
+};
+LineProcessor.prototype._flush = function(done) {
+    (this._extra + this.buffer).split('\n').forEach(this.lineIterator, this);
+
+    if (this._errorCount != 2) {
+        return done(new Error('Failed to parse database'));
+    }
+    this.push(this._lines.join(''));
+    done();
+};
+
+var parser = new LineProcessor();
+var writer = fs.createWriteStream(tempFilepath);
+
+db.relax({
+    db: dbName,
+    path: '_all_docs',
+    params: { include_docs: true},
+    method: 'GET'
+}).pipe(parser).pipe(writer).on('error', function(err) {
+    console.error(err);
+    process.exit(1);
+}).on('finish', function() {
+    var reader = fs.createReadStream(tempFilepath);
+    s3.putObject({
+        Bucket: argv.outputBucket,
+        Key: s3Key,
+        Body: reader,
+        ServerSideEncryption:'AES256'
+    }, function(err) {
+        if (err) {
+            console.error(err);
+            process.exit(1);
+        }
+        console.log('%s : Uploaded %s database to %s', (new Date()), argv.database, s3Key);
+        fs.unlink(tempFilepath);
+    });
 });
+
