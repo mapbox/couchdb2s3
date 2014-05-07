@@ -118,6 +118,7 @@ LineProcessor.prototype._flush = function(done) {
 
 var parser = new LineProcessor();
 var writer = fs.createWriteStream(tempFilepath);
+
 db.relax({
     db: dbName,
     path: '_all_docs',
