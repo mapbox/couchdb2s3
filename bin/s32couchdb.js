@@ -7,7 +7,7 @@ var Writable = require('stream').Writable;
 var AWS = require('aws-sdk');
 var nano = require('nano');
 var argv = require('optimist')
-    .config(['config', 'jobflows'])
+    .config(['config'])
     .usage('Import CouchDB Database from S3\n' +
            'Usage: $0 [required options] [--remoteName]'
     )
