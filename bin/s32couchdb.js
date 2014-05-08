@@ -108,7 +108,7 @@ s3.listObjects({
         reader.pipe(gunzip).pipe(importer, { end: false });
         gunzip.on('end', finish);
     } else {
-        reader.pipe(writer, { end: false });
+        reader.pipe(importer, { end: false });
         reader.on('end', finish);
     }
 });
