@@ -4,13 +4,14 @@ var util = require('util');
 var fs = require('fs');
 var url = require('url');
 var crypto = require('crypto');
+var zlib = require('zlib');
 var Transform = require('stream').Transform;
 var AWS = require('aws-sdk');
 var nano = require('nano');
 var argv = require('optimist')
-    .config(['config', 'jobflows'])
+    .config(['config'])
     .usage('Export CouchDB Database to s3\n' +
-           'Usage: $0 [options]'
+           'Usage: $0 [options] [--gzip]'
     )
     .demand(['outputBucket', 'database'])
     .argv;
@@ -119,15 +120,27 @@ LineProcessor.prototype._flush = function(done) {
 var parser = new LineProcessor();
 var writer = fs.createWriteStream(tempFilepath);
 
-db.relax({
+var dbStream = db.relax({
     db: dbName,
     path: '_all_docs',
     params: { include_docs: true},
     method: 'GET'
-}).pipe(parser).pipe(writer).on('error', function(err) {
+}).pipe(parser)
+
+var fsStream;
+if (argv.gzip) {
+    var gzip = zlib.createGzip();
+    fsStream = dbStream.pipe(gzip).pipe(writer);
+    s3Key += '.gz';
+} else {
+    fsStream = dbStream.pipe(writer);
+}
+
+fsStream.on('error', function(err) {
     console.error(err);
     process.exit(1);
-}).on('finish', function() {
+});
+fsStream.on('finish', function() {
     var reader = fs.createReadStream(tempFilepath);
     s3.putObject({
         Bucket: argv.outputBucket,

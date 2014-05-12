@@ -2,12 +2,13 @@
 
 var util = require('util');
 var url = require('url');
+var zlib = require('zlib');
 var qs = require('querystring').stringify;
 var Writable = require('stream').Writable;
 var AWS = require('aws-sdk');
 var nano = require('nano');
 var argv = require('optimist')
-    .config(['config', 'jobflows'])
+    .config(['config'])
     .usage('Import CouchDB Database from S3\n' +
            'Usage: $0 [required options] [--remoteName]'
     )
@@ -89,19 +90,25 @@ s3.listObjects({
 
     var key = data.Contents.pop().Key
 
-    var importer = new ImportStream();
     var reader = s3.getObject({
         Bucket: argv.inputBucket,
         Key: key
     }).createReadStream();
-    reader.pipe(importer, { end: false });
-    reader.on('end', function() {
+
+    var importer = new ImportStream();
+    var finish = function() {
         importer.flush(function(err) {
-            if (err) {
-                console.error(err);
-                process.exit(1);
-            }
+            if (err) throw err;
             console.log('%s : Imported %s into %s/%s', (new Date()), key, dbUrl.host, dbName);
         });
-    });
+    };
+
+    if (/\.gz$/.test(key)) {
+        var gunzip = zlib.createGunzip();
+        reader.pipe(gunzip).pipe(importer, { end: false });
+        gunzip.on('end', finish);
+    } else {
+        reader.pipe(importer, { end: false });
+        reader.on('end', finish);
+    }
 });
