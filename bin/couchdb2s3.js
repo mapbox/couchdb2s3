@@ -5,6 +5,7 @@ var fs = require('fs');
 var url = require('url');
 var crypto = require('crypto');
 var zlib = require('zlib');
+var StringDecoder = require('string_decoder').StringDecoder;
 var Transform = require('stream').Transform;
 var AWS = require('aws-sdk');
 var nano = require('nano');
@@ -62,22 +63,18 @@ function LineProcessor(opts) {
     opts.decodeStrings = true;
     Transform.call(this, opts);
 
+    // String decoder provides better utf8 support.
+    this._decoder = new StringDecoder('utf8');
+
     // Buffer
-    this.bufferLim = Math.pow(2, 18)
-    this.buffer = '';
+    this._bufferLim = Math.pow(2, 18)
+    this._buffer = '';
 
     // Iterator variables
-    this._extra = '';
     this._lines = [];
     this._errorCount = 0;
 }
 LineProcessor.prototype.lineIterator = function(line, i, arr) {
-    // The last element may be truncated, just hold onto it for now.
-    if (i == (arr.length - 1)) {
-        this._extra = line;
-        return;
-    }
-
     if (line.length == 0) return;
 
     try {
@@ -91,15 +88,20 @@ LineProcessor.prototype.lineIterator = function(line, i, arr) {
 };
 
 LineProcessor.prototype._transform = function(chunk, encoding, done) {
-    this.buffer += chunk.toString('utf8');
-    if (this.buffer.length < this.bufferLim) return done();
+    this._buffer += this._decoder.write(chunk);
 
-    chunk = this._extra + this.buffer;
-    this.buffer = '';
-    this._extra = '';
+    // Documents can be as large as 10mb
+    if (this._buffer.length < this._bufferLim)
+        return done();
 
-    chunk.split('\n').forEach(this.lineIterator, this);
+    // split on newlines
+    var lines = this._buffer.split('\n')
+    // keep the last partial line buffered
+    this._buffer = lines.pop();
 
+    lines.forEach(this.lineIterator, this);
+
+    // First and last lines will always fail to parse
     if (this._errorCount > 2)
         return done(new Error('Failed to parse database'));
 
@@ -108,7 +110,7 @@ LineProcessor.prototype._transform = function(chunk, encoding, done) {
     done();
 };
 LineProcessor.prototype._flush = function(done) {
-    (this._extra + this.buffer).split('\n').forEach(this.lineIterator, this);
+    this._buffer.split('\n').forEach(this.lineIterator, this);
 
     if (this._errorCount != 2) {
         return done(new Error('Failed to parse database'));
