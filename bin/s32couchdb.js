@@ -4,6 +4,7 @@ var util = require('util');
 var url = require('url');
 var zlib = require('zlib');
 var qs = require('querystring').stringify;
+var StringDecoder = require('string_decoder').StringDecoder;
 var Writable = require('stream').Writable;
 var AWS = require('aws-sdk');
 var nano = require('nano');
@@ -38,21 +39,20 @@ var s3 = new AWS.S3;
 //
 util.inherits(ImportStream, Writable);
 function ImportStream(opts) {
-    opts = opts || {};
-    opts.decodeStrings = true;
     Writable.call(this, opts);
-    this.buffer = '';
-    this.bufferLim = Math.pow(2, 18)
+    this._buffer = '';
+    this._bufferLim = Math.pow(2, 18)
+    this._decoder = new StringDecoder('utf8')
 }
 ImportStream.prototype._write = function(chunk, encoding, done) {
-    this.buffer += chunk.toString('utf8');
-    if (this.buffer.length < this.bufferLim) return done();
+    this._buffer += this._decoder.write(chunk);
+    if (this._buffer.length < this._bufferLim) return done();
 
     this.flush(done);
 };
 ImportStream.prototype.flush = function(done) {
-    var docs = this.buffer.split('\n');
-    this.buffer = docs.pop();
+    var docs = this._buffer.split('\n');
+    this._buffer = docs.pop();
 
     docs = docs.filter(function(v) {
         return v.length > 0;
@@ -61,7 +61,7 @@ ImportStream.prototype.flush = function(done) {
         // support wrapped docs.
         if (v.doc && v.doc._id) return v.doc;
         return v;
-    }.bind(this));
+    });
 
     db.bulk({ new_edits: false, docs: docs }, {}, done);
 };
