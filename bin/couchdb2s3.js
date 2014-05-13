@@ -7,10 +7,9 @@ var crypto = require('crypto');
 var zlib = require('zlib');
 var StringDecoder = require('string_decoder').StringDecoder;
 var Transform = require('stream').Transform;
-var AWS = require('aws-sdk');
+var utils = require('../lib/utils.js');
 var nano = require('nano');
 var argv = require('optimist')
-    .config(['config'])
     .usage('Export CouchDB Database to s3\n' +
            'Usage: $0 [options] [--gzip]'
     )
@@ -27,12 +26,7 @@ var db = nano(url.format({
     auth: dbUrl.auth
 }));
 
-AWS.config.update({
-    accessKeyId: argv.awsKey,
-    secretAccessKey: argv.awsSecret,
-    region: 'us-east-1'
-});
-var s3 = new AWS.S3;
+var s3 = utils.s3();
 
 var tempFilepath = '/tmp/couchdb2s3-'+ dbName +'-'+ (new Date()).getTime();
 
@@ -41,19 +35,9 @@ var rand = crypto.createHash('md5')
     .digest('base64')
     .replace(/[^a-zA-Z0-9]/g,'');
 
-var pad = function(n) {
-    var prefix = function(v, l) {
-        while (v.length < l) { v = '0' + v; }
-        return v;
-    };
-    var len = 2;
-    var s = n.toString();
-    return s.length == len ? s : prefix(s, len);
-};
-
 var d = new Date();
 var s3Key = util.format('db/%s-%s-%s-%s-%s-%s', dbName, d.getUTCFullYear(),
-    pad(d.getUTCMonth() + 1), pad(d.getUTCDate()), pad(d.getUTCHours()), rand);
+    utils.pad(d.getUTCMonth() + 1), utils.pad(d.getUTCDate()), utils.pad(d.getUTCHours()), rand);
 
 // LineProcessor class, transforms database into line oriented records.
 //

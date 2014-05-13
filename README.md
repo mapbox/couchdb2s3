@@ -10,20 +10,23 @@ Then later on s32couchdb that same file to get it into CouchDB instance.
 ## Usage
 
 ```
-couchdb2s3 --config config.json \
+couchdb2s3 \
   --outputBucket my-bucket \
   --database http://localhost:5984/my-database
+  --gzip
 ```
 
 and
 
 ```
-s32couchdb --config config.json \
+s32couchdb \
   --inputBucket my-bucket \
   --database http://localhost:5984/my-database
 ```
 
 The import script will not create a new database for you, you'll have to do that on your own.
+
+AWS credentials for uploading and retrieving exports can be provided either; as a IAM role assigned to an EC2, or a `~/.couchdb2s3rc` configuration file.
 
 ## Caveats
 

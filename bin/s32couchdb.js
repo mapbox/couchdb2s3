@@ -6,10 +6,9 @@ var zlib = require('zlib');
 var qs = require('querystring').stringify;
 var StringDecoder = require('string_decoder').StringDecoder;
 var Writable = require('stream').Writable;
-var AWS = require('aws-sdk');
+var utils = require('../lib/utils.js');
 var nano = require('nano');
 var argv = require('optimist')
-    .config(['config'])
     .usage('Import CouchDB Database from S3\n' +
            'Usage: $0 [required options] [--remoteName]'
     )
@@ -28,12 +27,7 @@ var db = nano(url.format({
 
 var remoteName = argv.remoteName || dbName;
 
-AWS.config.update({
-    accessKeyId: argv.awsKey,
-    secretAccessKey: argv.awsSecret,
-    region: 'us-east-1'
-});
-var s3 = new AWS.S3;
+var s3 = utils.s3();
 
 // ImportStream class writes to CouchDB
 //
@@ -66,23 +60,13 @@ ImportStream.prototype.flush = function(done) {
     db.bulk({ new_edits: false, docs: docs }, {}, done);
 };
 
-var pad = function(n) {
-    var prefix = function(v, l) {
-        while (v.length < l) { v = '0' + v; }
-        return v;
-    };
-    var len = 2;
-    var s = n.toString();
-    return s.length == len ? s : prefix(s, len);
-};
-
 var d = new Date(Date.now() - 864e5); // Look 1 day back.
 
 s3.listObjects({
     Bucket: argv.inputBucket,
     Prefix: util.format('db/%s-', remoteName),
     Marker: util.format('db/%s-%s-%s-%s', remoteName, d.getUTCFullYear(),
-        pad(d.getUTCMonth() + 1), pad(d.getUTCDate()))
+        utils.pad(d.getUTCMonth() + 1), utils.pad(d.getUTCDate()))
 }, function(err, data) {
     if (err) throw err;
     if (data.Contents.length === 0)
