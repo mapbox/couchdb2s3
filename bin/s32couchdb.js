@@ -1,21 +1,23 @@
 #!/usr/bin/env node
 
+process.title = 's32couchdb';
+
 var util = require('util');
 var url = require('url');
 var zlib = require('zlib');
 var qs = require('querystring').stringify;
 var StringDecoder = require('string_decoder').StringDecoder;
 var Writable = require('stream').Writable;
-var utils = require('../lib/utils.js');
 var nano = require('nano');
-var argv = require('optimist')
-    .usage('Import CouchDB Database from S3\n' +
-           'Usage: $0 [required options] [--remoteName]'
-    )
-    .demand(['inputBucket', 'database'])
-    .argv;
+var AWS = require('aws-sdk');
+var utils = require('../lib/utils.js');
 
-process.title = 's32couchdb';
+var argv = utils.config({
+    demand: ['inputBucket', 'database'],
+    optional: ['remoteName', 'awsKey', 'awsSecret'],
+    usage: 'Import CouchDB Database from S3\n' +
+           'Usage: $0 [required options] [--remoteName]'
+});
 
 var dbUrl = url.parse(argv.database);
 var dbName = dbUrl.pathname.split('/')[1];
@@ -27,7 +29,12 @@ var db = nano(url.format({
 
 var remoteName = argv.remoteName || dbName;
 
-var s3 = utils.s3();
+AWS.config.update({
+    accessKeyId: argv.awsKey,
+    secretAccessKey: argv.awsSecret,
+    region: 'us-east-1'
+});
+var s3 = new AWS.S3;
 
 // ImportStream class writes to CouchDB
 //

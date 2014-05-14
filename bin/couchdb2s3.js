@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+process.title = 'couchdb2s3';
+
 var util = require('util');
 var fs = require('fs');
 var url = require('url');
@@ -7,16 +9,16 @@ var crypto = require('crypto');
 var zlib = require('zlib');
 var StringDecoder = require('string_decoder').StringDecoder;
 var Transform = require('stream').Transform;
-var utils = require('../lib/utils.js');
+var AWS = require('aws-sdk');
 var nano = require('nano');
-var argv = require('optimist')
-    .usage('Export CouchDB Database to s3\n' +
-           'Usage: $0 [options] [--gzip]'
-    )
-    .demand(['outputBucket', 'database'])
-    .argv;
+var utils = require('../lib/utils.js');
 
-process.title = 'couchdb2s3';
+var argv = utils.config({
+    demand: ['outputBucket', 'database'],
+    optional: ['gzip', 'awsKey', 'awsSecret'],
+    usage: 'Export CouchDB Database to s3\n' +
+           'Usage: $0 [options] [--gzip]'
+});
 
 var dbUrl = url.parse(argv.database);
 var dbName = dbUrl.pathname.split('/')[1];
@@ -26,7 +28,12 @@ var db = nano(url.format({
     auth: dbUrl.auth
 }));
 
-var s3 = utils.s3();
+AWS.config.update({
+    accessKeyId: argv.awsKey,
+    secretAccessKey: argv.awsSecret,
+    region: 'us-east-1'
+});
+var s3 = new AWS.S3;
 
 var tempFilepath = '/tmp/couchdb2s3-'+ dbName +'-'+ (new Date()).getTime();
 
