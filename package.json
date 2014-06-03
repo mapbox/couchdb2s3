@@ -11,7 +11,7 @@
     },
     "dependencies": {
         "minimist": "0.1.x",
-        "superenv": "0.0.1",
+        "dotenv": "0.2.8",
         "aws-sdk": "1.17.x",
         "nano": "4.2.x"
     },

@@ -9,15 +9,14 @@ var crypto = require('crypto');
 var zlib = require('zlib');
 var StringDecoder = require('string_decoder').StringDecoder;
 var Transform = require('stream').Transform;
-var AWS = require('aws-sdk');
 var nano = require('nano');
 var utils = require('../lib/utils.js');
 
 var argv = utils.config({
-    demand: ['outputBucket', 'database'],
-    optional: ['gzip', 'awsKey', 'awsSecret'],
+    demand: ['bucket', 'database'],
+    optional: ['gzip'],
     usage: 'Export CouchDB Database to s3\n' +
-           'Usage: $0 [options] [--gzip]'
+           'Usage: couchdb2s3 --bucket my-bucket --database "http://localhost:5984/my-database" [--gzip]'
 });
 
 var dbUrl = url.parse(argv.database);
@@ -27,13 +26,6 @@ var db = nano(url.format({
     host: dbUrl.host,
     auth: dbUrl.auth
 }));
-
-AWS.config.update({
-    accessKeyId: argv.awsKey,
-    secretAccessKey: argv.awsSecret,
-    region: 'us-east-1'
-});
-var s3 = new AWS.S3;
 
 var tempFilepath = '/tmp/couchdb2s3-'+ dbName +'-'+ (new Date()).getTime();
 
@@ -135,8 +127,8 @@ fsStream.on('error', function(err) {
 });
 fsStream.on('finish', function() {
     var reader = fs.createReadStream(tempFilepath);
-    s3.putObject({
-        Bucket: argv.outputBucket,
+    utils.s3.putObject({
+        Bucket: argv.bucket,
         Key: s3Key,
         Body: reader,
         ServerSideEncryption:'AES256'
