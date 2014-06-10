@@ -2,7 +2,6 @@
     "name": "couchdb2s3",
     "version": "0.3.0",
     "description": "Export CouchDB databases to line oriented json files on s3",
-    "main": "index.js",
     "bin": {
         "couchdb2s3": "bin/couchdb2s3.js",
         "s32couchdb": "bin/s32couchdb.js"
@@ -11,7 +10,8 @@
         "test": "echo \"Error: no test specified\" && exit 1"
     },
     "dependencies": {
-        "optimist": "https://github.com/willwhite/node-optimist/archive/config-file.tar.gz",
+        "minimist": "0.1.x",
+        "dotenv": "0.2.8",
         "aws-sdk": "1.17.x",
         "nano": "4.2.x"
     },

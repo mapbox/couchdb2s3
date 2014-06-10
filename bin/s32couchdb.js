@@ -1,22 +1,22 @@
 #!/usr/bin/env node
 
+process.title = 's32couchdb';
+
 var util = require('util');
 var url = require('url');
 var zlib = require('zlib');
 var qs = require('querystring').stringify;
 var StringDecoder = require('string_decoder').StringDecoder;
 var Writable = require('stream').Writable;
-var AWS = require('aws-sdk');
 var nano = require('nano');
-var argv = require('optimist')
-    .config(['config'])
-    .usage('Import CouchDB Database from S3\n' +
-           'Usage: $0 [required options] [--remoteName]'
-    )
-    .demand(['inputBucket', 'database'])
-    .argv;
+var utils = require('../lib/utils.js');
 
-process.title = 's32couchdb';
+var argv = utils.config({
+    demand: ['bucket', 'database'],
+    optional: ['prefix', 'marker'],
+    usage: 'Import CouchDB Database from S3\n' +
+           'Usage: s32couchdb --bucket my-bucket --database "http://localhost:5984/my-database" [--prefix "prefix/my-database" --marker "prefix/my-database-2010-12-31"]'
+});
 
 var dbUrl = url.parse(argv.database);
 var dbName = dbUrl.pathname.split('/')[1];
@@ -25,15 +25,6 @@ var db = nano(url.format({
     host: dbUrl.host,
     auth: dbUrl.auth
 })).use(dbName);
-
-var remoteName = argv.remoteName || dbName;
-
-AWS.config.update({
-    accessKeyId: argv.awsKey,
-    secretAccessKey: argv.awsSecret,
-    region: 'us-east-1'
-});
-var s3 = new AWS.S3;
 
 // ImportStream class writes to CouchDB
 //
@@ -66,23 +57,15 @@ ImportStream.prototype.flush = function(done) {
     db.bulk({ new_edits: false, docs: docs }, {}, done);
 };
 
-var pad = function(n) {
-    var prefix = function(v, l) {
-        while (v.length < l) { v = '0' + v; }
-        return v;
-    };
-    var len = 2;
-    var s = n.toString();
-    return s.length == len ? s : prefix(s, len);
-};
-
 var d = new Date(Date.now() - 864e5); // Look 1 day back.
 
-s3.listObjects({
-    Bucket: argv.inputBucket,
-    Prefix: util.format('db/%s-', remoteName),
-    Marker: util.format('db/%s-%s-%s-%s', remoteName, d.getUTCFullYear(),
-        pad(d.getUTCMonth() + 1), pad(d.getUTCDate()))
+var prefix = argv.prefix || util.format('db/%s-', dbName);
+var marker = argv.marker || util.format('%s-%s-%s-%s', prefix, d.getUTCFullYear(), utils.pad(d.getUTCMonth() + 1), utils.pad(d.getUTCDate()))
+
+utils.s3.listObjects({
+    Bucket: argv.bucket,
+    Prefix: prefix,
+    Marker: marker
 }, function(err, data) {
     if (err) throw err;
     if (data.Contents.length === 0)
@@ -90,8 +73,8 @@ s3.listObjects({
 
     var key = data.Contents.pop().Key
 
-    var reader = s3.getObject({
-        Bucket: argv.inputBucket,
+    var reader = utils.s3.getObject({
+        Bucket: argv.bucket,
         Key: key
     }).createReadStream();
 
