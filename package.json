@@ -1,1 +1,25 @@
-{"bin": {"couchdb2s3": "bin/couchdb2s3.js", "s32couchdb": "bin/s32couchdb.js"}, "license": "BSD-2-Clause", "engines": {"node": ">0.10.0"}, "version": "1.0.0", "repository": {"url": "http://github.com/mapbox/couchdb2s3.git", "type": "git"}, "author": "MapBox", "description": "Export CouchDB databases to line oriented json files on s3", "dependencies": {"dotenv": "0.2.8", "aws-sdk": "1.17.x", "nano": "4.2.x", "minimist": "0.1.x"}, "scripts": {"test": "echo \"Error: no test specified\" && exit 1"}, "name": "couchdb2s3"}
+{
+  "bin": {
+    "couchdb2s3": "bin/couchdb2s3.js",
+    "s32couchdb": "bin/s32couchdb.js"
+  },
+  "license": "BSD-2-Clause",
+  "engines": {"node": ">0.10.0"},
+  "version": "1.0.0",
+  "repository": {
+    "url": "http://github.com/mapbox/couchdb2s3.git",
+    "type": "git"
+  },
+  "author": "MapBox",
+  "description": "Export CouchDB databases to line oriented json files on s3",
+  "dependencies": {
+    "dotenv": "0.2.8",
+    "aws-sdk": "1.17.x",
+    "nano": "4.2.x",
+    "minimist": "0.1.x"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "name": "couchdb2s3"
+}
